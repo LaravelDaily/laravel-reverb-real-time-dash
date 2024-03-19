@@ -23,7 +23,7 @@
                                             </span>
                                         </div>
                                         <div class="text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
-                                            $ <span>{{ Number::format($totalRevenue) }}</span>
+                                            $ <span id="box_total_revenue">{{ Number::format($totalRevenue) }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -35,7 +35,8 @@
                                             </span>
                                         </div>
                                         <div class="text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
-                                            $ {{ Number::format($thisMonthRevenue) }}
+                                            $
+                                            <span id="box_revenue_this_month">{{ Number::format($thisMonthRevenue) }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -47,7 +48,7 @@
                                             </span>
                                         </div>
                                         <div class="text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
-                                            $ {{ Number::format($todayRevenue) }}
+                                            $ <span id="box_revenue_today">{{ Number::format($todayRevenue) }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -71,7 +72,8 @@
                                     </div>
                                 </div>
                                 <div class=" relative divide-y divide-gray-200 overflow-x-auto dark:divide-white/10 dark:border-t-white/10">
-                                    <table class=" w-full table-auto divide-y divide-gray-200 text-start dark:divide-white/5">
+                                    <table class=" w-full table-auto divide-y divide-gray-200 text-start dark:divide-white/5"
+                                           id="latest-orders-table">
                                         <thead class="bg-gray-50 dark:bg-white/5">
                                         <tr>
                                             <th class=" px-3 py-3.5 sm:first-of-type:ps-6 sm:last-of-type:pe-6 ">
@@ -190,16 +192,57 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script type="text/html" id="table-row-template">
+        <tr class=" [@media(hover:hover)]:transition [@media(hover:hover)]:duration-75 bg-green-100">
+            <td class=" p-0 first-of-type:ps-1 last-of-type:pe-1 sm:first-of-type:ps-3 sm:last-of-type:pe-3 ">
+                <div class="flex w-full disabled:pointer-events-none justify-start text-start">
+                    <div class=" grid gap-y-1 px-3 py-4">
+                        <div class="flex max-w-max">
+                            <div class=" inline-flex items-center gap-1.5 text-sm text-gray-950 dark:text-white  "
+                                 style="">
+                                _DATE_
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td class=" p-0 first-of-type:ps-1 last-of-type:pe-1 sm:first-of-type:ps-3 sm:last-of-type:pe-3 .email">
+                <div class="flex w-full disabled:pointer-events-none justify-start text-start">
+                    <div class=" grid gap-y-1 px-3 py-4">
+                        <div class="flex max-w-max">
+                            <div class=" inline-flex items-center gap-1.5 text-sm text-gray-950 dark:text-white  "
+                                 style="">
+                                _EMAIL_
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td class=" p-0 first-of-type:ps-1 last-of-type:pe-1 sm:first-of-type:ps-3 sm:last-of-type:pe-3 ">
+                <div class="flex w-full disabled:pointer-events-none justify-start text-start">
+                    <div class=" grid gap-y-1 px-3 py-4">
+                        <div class="flex max-w-max">
+                            <div class=" inline-flex items-center gap-1.5 text-sm text-gray-950 dark:text-white  "
+                                 style="">
+                                $ _TOTAL_
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </script>
+
     <script>
         const revenueByDay = document.getElementById('revenueByDay');
         const revenueByMonth = document.getElementById('revenueByMonth');
 
-        new Chart(revenueByDay, {
+        let revenueByDayChart = new Chart(revenueByDay, {
             type: 'bar',
             data: {
                 labels: @json($orderChartByDay['labels']),
                 datasets: [{
-                    label: '# of Votes',
                     data: @json($orderChartByDay['totals']),
                     borderWidth: 1
                 }]
@@ -218,12 +261,11 @@
             }
         });
 
-        new Chart(revenueByMonth, {
+        let revenueByMonthChart = new Chart(revenueByMonth, {
             type: 'bar',
             data: {
                 labels: @json($orderChartByMonth['labels']),
                 datasets: [{
-                    label: '# of Votes',
                     data: @json($orderChartByMonth['totals']),
                     borderWidth: 1
                 }]
@@ -241,5 +283,65 @@
                 }
             }
         });
+
+        window.addEventListener('DOMContentLoaded', function () {
+            let totalRevenue = document.getElementById('box_total_revenue');
+            let revenueThisMonth = document.getElementById('box_revenue_this_month');
+            let revenueToday = document.getElementById('box_revenue_today');
+            let latestOrdersTable = document.getElementById('latest-orders-table');
+            let tableRowTemplate = document.getElementById('table-row-template').innerHTML;
+
+            let channel = window.Echo.private('order-dashboard-updates');
+            channel.listen('OrderCreatedEvent', function (e) {
+                // Update the revenue widgets
+                totalRevenue.innerText = e.totalRevenue;
+                revenueThisMonth.innerText = e.thisMonthRevenue;
+                revenueToday.innerText = e.todayRevenue;
+
+                // Insert the new row at the top of the table
+                let newRow = tableRowTemplate
+                    .replace('_DATE_', e.latestOrders[0].created_at)
+                    .replace('_EMAIL_', e.latestOrders[0].user.email)
+                    .replace('_TOTAL_', e.latestOrders[0].total);
+                latestOrdersTable.querySelector('tbody').insertAdjacentHTML('afterbegin', newRow);
+
+                setTimeout(function () {
+                    // Remove the green background from the rows
+                    let lines = latestOrdersTable.querySelectorAll('tbody tr');
+                    lines.forEach(function (line) {
+                        line.classList.remove('bg-green-100');
+                    });
+                }, 2500)
+                // remove the last row of the table
+                latestOrdersTable.querySelector('tbody tr:last-child').remove();
+
+
+                if (!revenueByDayChart.data.labels.includes(e.orderChartByDay.labels[0])) {
+                    // If there is no data for the day, add it
+                    revenueByDayChart.data.labels.push(e.orderChartByDay.labels[0]);
+                    revenueByDayChart.data.datasets[0].data.push(e.orderChartByDay.totals[0]);
+                    revenueByDayChart.update();
+                } else {
+                    // If there is data for the day, update it
+                    let index = revenueByDayChart.data.labels.indexOf(e.orderChartByDay.labels[0]);
+                    revenueByDayChart.data.datasets[0].data[index] = e.orderChartByDay.totals[0];
+                    revenueByDayChart.update();
+                }
+
+
+                if (!revenueByMonthChart.data.labels.includes(e.orderChartByMonth.labels[0])) {
+                    // If there is no data for the month, add it
+                    revenueByMonthChart.data.labels.push(e.orderChartByMonth.labels[0]);
+                    revenueByMonthChart.data.datasets[0].data.push(e.orderChartByMonth.totals[0]);
+                    revenueByMonthChart.update();
+                } else {
+                    // If there is data for the month, update it
+                    let index = revenueByMonthChart.data.labels.indexOf(e.orderChartByMonth.labels[0]);
+                    revenueByMonthChart.data.datasets[0].data[index] = e.orderChartByMonth.totals[0];
+                    revenueByMonthChart.update();
+                }
+            });
+        })
+
     </script>
 </x-app-layout>

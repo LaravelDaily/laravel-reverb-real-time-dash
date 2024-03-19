@@ -43,7 +43,7 @@ class OrdersService
     {
         $orders = Order::query()
             ->selectRaw('DATE(created_at) as date, SUM(total) as total')
-            ->where('created_at', '>=', now()->subDays($days))
+            ->where('created_at', '>=', now()->subDays($days)->startOfDay())
             ->groupBy('date')
             ->get();
 
@@ -63,7 +63,7 @@ class OrdersService
             ->selectRaw('strftime("%Y", created_at) as year, strftime("%m", created_at) as month, SUM(total) as total')
             // MySQL date functions
 //            ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, SUM(total) as total')
-            ->where('created_at', '>=', now()->subMonths($months))
+            ->where('created_at', '>=', now()->subMonthsNoOverflow($months)->startOfMonth())
             ->groupBy('year', 'month')
             ->get();
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\OrderCreatedEvent;
 use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
 use App\Models\User;
@@ -22,8 +23,11 @@ class OrderController extends Controller
 
     public function store(StoreOrderRequest $request)
     {
-        Order::create($request->validated());
+        $order = Order::create($request->validated());
 
-        return redirect()->route('dashboard');
+        event(new OrderCreatedEvent($order));
+
+        return redirect()->route('orders.create');
+//        return redirect()->route('dashboard');
     }
 }

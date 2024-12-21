@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\View\View;
 use App\Services\OrdersService;
 
 class DashboardController extends Controller
 {
-    public function __invoke(OrdersService $ordersService)
+    public function __invoke(OrdersService $ordersService): View
     {
         $totalRevenue = $ordersService->getTotalRevenue();
         $thisMonthRevenue = $ordersService->getThisMonthRevenue();
